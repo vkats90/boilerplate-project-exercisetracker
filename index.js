@@ -38,7 +38,7 @@ const UserSchema = new mongoose.Schema({
       required: false
     },
     date: {
-      type:Date,
+      type:String,
       required: false
     },
   }]
@@ -75,16 +75,19 @@ const createUser = async (uname) => {
 
 const findUserById = async (id) =>{
   try {
-    let user = User.findById({_id:id});
+    let user = await User.findById({_id:id});
     return user;
   } catch {
     errorHandle(err)
   }
 }
+
 const addExerciseToUser = async (id,desc,dur,date) => {
-  let user = await User.findUserById(id);
-  user.exercises.push({'description':desc,'duration':dur,'date':new date});
-  user.save();
+  let user = await User.findById({_id:id});
+  console.log(user);
+  user.exercise.push({'description':desc,'duration':dur,'date':date});
+  await user.save();
+  return user
 }
 
 // Middleware section
@@ -107,7 +110,7 @@ app.post('/api/users',async (req,res,next)=>{
   next()
   },async (req,res)=>{
     let id = await findUserByName(req.body.username)
-    res.json({"username":req.body.username,"id":id._id})
+    res.json({"username":req.body.username,"_id":id._id})
   })
 
 app.get('/api/users',async (req,res)=>{
@@ -116,8 +119,23 @@ app.get('/api/users',async (req,res)=>{
 })
 
 app.post('/api/users/:id/exercises',async (req,res)=>{
-  let user = await findUserById(req.params.id)
-  res.json({'_id':user._id,'username':user.username,'date':req.body.date,'duration':req.body.duration,'description':req.body.description})
+  if (!req.body.date) req.body.date = Date.now();
+  let dateFormat = new Date(req.body.date).toDateString()
+  let user = await addExerciseToUser(req.params.id,req.body.description,req.body.duration,dateFormat)
+  res.json({'_id':user._id,'username':user.username,'date':dateFormat,'duration':Number(req.body.duration),'description':req.body.description})
+})
+
+app.get('/api/users/:id/logs',async (req,res)=>{
+  let user = await findUserById(req.params.id);
+  let exercises = user.exercise
+  for (let i in exercises) {
+    exercises[i].date=new Date(exercises[i].date).toDateString()
+    console.log(exercises[i].date)
+  }
+  //let exercises = user.exercise.map((x)=>x.date=new Date(x.date).toDateString());
+  //user.excercise = exercises;
+  let count = user.exercise.length;
+  res.json({username:user.username,_id:user._id,count:count,log:exercises})
 })
 
 const listener = app.listen(process.env.PORT || 3000, () => {
