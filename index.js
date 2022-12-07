@@ -128,14 +128,17 @@ app.post('/api/users/:id/exercises',async (req,res)=>{
 app.get('/api/users/:id/logs',async (req,res)=>{
   let user = await findUserById(req.params.id);
   let exercises = user.exercise
+    req.query.from?exercises=exercises.filter(x=>new Date(x.date)>new Date(req.query.from)):exercises
+    req.query.to?exercises=exercises.filter(x=>new Date(x.date)<new Date(req.query.to)):exercises
+    req.query.limit?exercises=exercises.filter((x,i)=>i<=req.query.limit):exercises
+    //exercises = exercises.filter((x,i)=>new Date(x.date)>new Date(req.query.from) && new Date(x.date)<new Date(req.query.to) && i<=req.query.limit)
+    exercises = exercises.map(x=>({'description':x.description,'duration':x.duration,'date':x.date}))
   for (let i in exercises) {
-    exercises[i].date=new Date(exercises[i].date).toDateString()
-    console.log(exercises[i].date)
+        exercises[i].date=new Date(exercises[i].date).toDateString()
   }
-  //let exercises = user.exercise.map((x)=>x.date=new Date(x.date).toDateString());
-  //user.excercise = exercises;
-  let count = user.exercise.length;
-  res.json({username:user.username,_id:user._id,count:count,log:exercises})
+
+  let count = exercises.length;
+  res.json({_id:user._id,username:user.username,from:req.query.from,to:req.query.to,limit:req.query.limit,count:count,log:exercises})
 })
 
 const listener = app.listen(process.env.PORT || 3000, () => {
