@@ -49,7 +49,7 @@ const User = new mongoose.model('User',UserSchema);
 // MongoDB methods
 
 const errorHandle = (err) =>{
-  console.log("Trouble connecting to database"+err);
+  console.log("Eroor: "+err);
 }
 const findUserByName = async (uname) => {
   try {
@@ -77,17 +77,21 @@ const findUserById = async (id) =>{
   try {
     let user = await User.findById({_id:id});
     return user;
-  } catch {
+  } catch(err) {
     errorHandle(err)
   }
 }
 
 const addExerciseToUser = async (id,desc,dur,date) => {
-  let user = await User.findById({_id:id});
-  console.log(user);
-  user.exercise.push({'description':desc,'duration':dur,'date':date});
-  await user.save();
-  return user
+  try{
+    let user = await User.findById({_id:id});
+    console.log(user);
+    user.exercise.push({'description':desc,'duration':dur,'date':new Date(date).toDateString()});
+    await user.save();
+    return user 
+  } catch(err) {
+    errorHandle(err)
+  }
 }
 
 // Middleware section
@@ -119,11 +123,16 @@ app.get('/api/users',async (req,res)=>{
 })
 
 app.post('/api/users/:id/exercises',async (req,res)=>{
-  if (!req.body.date) req.body.date = Date.now();
-  let dateFormat = new Date(req.body.date).toDateString()
-  let user = await addExerciseToUser(req.params.id,req.body.description,req.body.duration,dateFormat)
-  res.json({'_id':user._id,'username':user.username,'date':dateFormat,'duration':Number(req.body.duration),'description':req.body.description})
-})
+  try{
+    if (!req.body.date) req.body.date = Date.now();
+    let dateFormat = new Date(req.body.date).toDateString()
+    let user = await addExerciseToUser(req.params.id,req.body.description,req.body.duration,dateFormat)
+    res.json({'_id':user._id,'username':user.username,'date':dateFormat,'duration':Number(req.body.duration),'description':req.body.description})
+  } catch(err) {
+    errorHandle(err)
+    res.json(err)
+  }
+  })
 
 app.get('/api/users/:id/logs',async (req,res)=>{
   let user = await findUserById(req.params.id);
@@ -132,13 +141,11 @@ app.get('/api/users/:id/logs',async (req,res)=>{
     req.query.to?exercises=exercises.filter(x=>new Date(x.date)<new Date(req.query.to)):exercises
     req.query.limit?exercises=exercises.filter((x,i)=>i<=req.query.limit):exercises
     //exercises = exercises.filter((x,i)=>new Date(x.date)>new Date(req.query.from) && new Date(x.date)<new Date(req.query.to) && i<=req.query.limit)
-    exercises = exercises.map(x=>({'description':x.description,'duration':x.duration,'date':x.date}))
-  for (let i in exercises) {
-        exercises[i].date=new Date(exercises[i].date).toDateString()
-  }
+    exercises = exercises.map(x=>({'description':x.description,'duration':x.duration,'date':new Date(x.date).toDateString()}))
+
 
   let count = exercises.length;
-  res.json({_id:user._id,username:user.username,from:req.query.from,to:req.query.to,limit:req.query.limit,count:count,log:exercises})
+  res.json({_id:user._id,username:user.username,from:req.query.from?new Date(req.query.from).toDateString():undefined,to:req.query.to?new Date(req.query.to).toDateString():undefined,limit:req.query.limit,count:count,log:exercises})
 })
 
 const listener = app.listen(process.env.PORT || 3000, () => {
