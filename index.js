@@ -85,7 +85,6 @@ const findUserById = async (id) =>{
 const addExerciseToUser = async (id,desc,dur,date) => {
   try{
     let user = await User.findById({_id:id});
-    console.log(user);
     user.exercise.push({'description':desc,'duration':dur,'date':new Date(date).toDateString()});
     await user.save();
     return user 
@@ -124,8 +123,9 @@ app.get('/api/users',async (req,res)=>{
 
 app.post('/api/users/:id/exercises',async (req,res)=>{
   try{
+    req.body.date?req.body.date+='T00:00:00':undefined;
     if (!req.body.date) req.body.date = Date.now();
-    let dateFormat = new Date(req.body.date).toDateString()
+    let dateFormat = new Date(req.body.date).toDateString();
     let user = await addExerciseToUser(req.params.id,req.body.description,req.body.duration,dateFormat)
     res.json({'_id':user._id,'username':user.username,'date':dateFormat,'duration':Number(req.body.duration),'description':req.body.description})
   } catch(err) {
@@ -137,15 +137,17 @@ app.post('/api/users/:id/exercises',async (req,res)=>{
 app.get('/api/users/:id/logs',async (req,res)=>{
   let user = await findUserById(req.params.id);
   let exercises = user.exercise
-    req.query.from?exercises=exercises.filter(x=>new Date(x.date)>new Date(req.query.from)):exercises
-    req.query.to?exercises=exercises.filter(x=>new Date(x.date)<new Date(req.query.to)):exercises
-    req.query.limit?exercises=exercises.filter((x,i)=>i<=req.query.limit):exercises
+ 
+    req.query.from?(exercises=exercises.filter(x=>new Date(x.date)>new Date(req.query.from+'T00:00:00'))):exercises
+    req.query.to?exercises=exercises.filter(x=>new Date(x.date)<new Date(req.query.to+'T00:00:00')):exercises
+    req.query.limit?exercises=exercises.filter((x,i)=>i<Number(req.query.limit)):exercises
     //exercises = exercises.filter((x,i)=>new Date(x.date)>new Date(req.query.from) && new Date(x.date)<new Date(req.query.to) && i<=req.query.limit)
-    exercises = exercises.map(x=>({'description':x.description,'duration':x.duration,'date':new Date(x.date).toDateString()}))
+    exercises = exercises.map(x=>({'description':x.description,'duration':x.duration,'date':x.date}))
 
 
   let count = exercises.length;
-  res.json({_id:user._id,username:user.username,from:req.query.from?new Date(req.query.from).toDateString():undefined,to:req.query.to?new Date(req.query.to).toDateString():undefined,limit:req.query.limit,count:count,log:exercises})
+  res.json({_id:user._id,username:user.username,from:req.query.from?new Date(req.query.from+'T00:00:00').toDateString():undefined,to:req.query.to?new Date(req.query.to+'T00:00:00').toDateString():undefined,limit:req.query.limit,count:count,log:exercises})
+  console.log({_id:user._id,username:user.username,from:req.query.from?new Date(req.query.from+'T00:00:00').toDateString():undefined,to:req.query.to?new Date(req.query.to+'T00:00:00').toDateString():undefined,limit:req.query.limit,count:count,log:exercises})
 })
 
 const listener = app.listen(process.env.PORT || 3000, () => {
