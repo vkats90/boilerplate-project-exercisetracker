@@ -13,47 +13,41 @@ mongoose.connect('mongodb+srv://mars77:1234@cluster0.xbzwd5f.mongodb.net/mongodb
   useUnifiedTopology: true 
 }); 
 
-const Exercise = new mongoose.Schema({
-  username: {
-    type:String,
-    required: true
-  },
-  description: String,
-  duration: Number,
-  date: Date,
+const ExerciseSchema = new mongoose.Schema({
+    id: {
+      type:String,
+      required: true
+    },
+    description: {
+      type:String,
+      required: true
+    },
+    duration: {
+      type:Number,
+      required: true
+    },
+    date:String,
 })
 
 const UserSchema = new mongoose.Schema({
   username:{
     type:String,
     required:true
-  },
-  exercise:[{
-    description: {
-      type:String,
-      required: false
-    },
-    duration: {
-      type:Number,
-      required: false
-    },
-    date: {
-      type:String,
-      required: false
-    },
-  }]
+  }
 })
 
-const User = new mongoose.model('User',UserSchema);
+const Person = new mongoose.model('Person',UserSchema);
+const Exercise = new mongoose.model('Exercise',ExerciseSchema);
 
 // MongoDB methods
 
 const errorHandle = (err) =>{
   console.log("Eroor: "+err);
 }
+
 const findUserByName = async (uname) => {
   try {
-    let found = await User.findOne({'username':uname});
+    let found = await Person.findOne({'username':uname}).select('username _id');
     return found
   } catch {
     errorHandle(err)
@@ -62,7 +56,7 @@ const findUserByName = async (uname) => {
 
 const listUsers = () => {
   try {
-    const list = User.find().select('username')
+    const list = Person.find().select('username')
     return list;
   } catch {
     errorHandle(err);
@@ -70,25 +64,21 @@ const listUsers = () => {
 }
 
 const createUser = async (uname) => {
-  await User.create({'username':uname})
+  await Person.create({'username':uname})
 }
 
 const findUserById = async (id) =>{
   try {
-    let user = await User.findById({_id:id});
+    let user = await Person.findById({_id:id});
     return user;
   } catch(err) {
     errorHandle(err)
   }
 }
 
-const addExerciseToUser = async (id,desc,dur,date) => {
+const addExercise = async (id,desc,dur,date) => {
   try{
-    let user = await User.findById({_id:id});
-    console.log(user);
-    user.exercise.push({'description':desc,'duration':dur,'date':new Date(date).toDateString()});
-    await user.save();
-    return user 
+    await Exercise.create({'_id':id,'description':desc,'duration':dur,'date':new Date(date).toDateString()});
   } catch(err) {
     errorHandle(err)
   }
@@ -108,13 +98,12 @@ app.get('/', (req, res) => {
 app.post('/api/users',async (req,res,next)=>{
   let id = await findUserByName(req.body.username)
   if (id == null) {
-    await createUser(req.body.username);
-    id = await findUserByName(req.body.username)
+    let user = await createUser(req.body.username);
   }
   next()
   },async (req,res)=>{
-    let id = await findUserByName(req.body.username)
-    res.json({"username":req.body.username,"_id":id._id})
+    let user = await findUserByName(req.body.username)
+    res.json(user)
   })
 
 app.get('/api/users',async (req,res)=>{
@@ -126,8 +115,9 @@ app.post('/api/users/:id/exercises',async (req,res)=>{
   try{
     if (!req.body.date) req.body.date = Date.now();
     let dateFormat = new Date(req.body.date).toDateString()
-    let user = await addExerciseToUser(req.params.id,req.body.description,req.body.duration,dateFormat)
-    res.json({'_id':user._id,'username':user.username,'date':dateFormat,'duration':Number(req.body.duration),'description':req.body.description})
+    let user = await findUserById(req.params.id)
+    let exercise = await addExercise(req.params.id,req.body.description,req.body.duration,dateFormat)
+    res.json(user)
   } catch(err) {
     errorHandle(err)
     res.json(err)
